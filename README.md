@@ -59,3 +59,9 @@ The `id` must be unique, lowercase, and ASCII-only because it is used in saved a
 ## Notes
 
 This app is client-only. No account or server is required, and tracker progress stays in your browser unless you export it.
+
+## 注意
+
+AI運用の練習もかねているため、このセクションを除いてすべてAI製です。
+ご自由にご利用ください。
+キャラ追加は遊んでいる間は適時追加していきます。
