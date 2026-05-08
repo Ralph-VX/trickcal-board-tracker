@@ -673,6 +673,16 @@
       "en": "Rohne",
       "zh-Hant": "洛涅"
     }
+  },
+  {
+    "id": "kyarot",
+    "name": "キャロット",
+    "race": "妖精",
+    "type": 2,
+    "names": {
+      "en": "Kyarot",
+      "zh-Hant": "卡洛特"
+    }
   }
 ];
 })(window);
