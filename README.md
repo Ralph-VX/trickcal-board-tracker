@@ -15,6 +15,7 @@ Open the app here:
 - Switch between Japanese, English, and Traditional Chinese character names.
 - View board and cell statistics, including spent and remaining special crayons.
 - Export and import progress as JSON.
+- Optionally save and load progress from Google Drive app data storage.
 - Uses ASCII character IDs in exported JSON for easier sharing and editing.
 
 ## Usage
@@ -22,6 +23,31 @@ Open the app here:
 Use the GitHub Pages link above, or open `index.html` directly in a browser after cloning the repository.
 
 Progress is saved in your browser's local storage. Use **Export JSON** to back up your tracker state, and **Import JSON** to restore it later.
+
+## Google Drive Sync
+
+Google Drive sync is optional. It stores one JSON file in the signed-in user's hidden Google Drive `appDataFolder` using the Drive API scope:
+
+```txt
+https://www.googleapis.com/auth/drive.appdata
+```
+
+To enable it for a deployment:
+
+1. Create a Google Cloud project.
+2. Enable the Google Drive API.
+3. Configure the OAuth consent screen.
+4. Create an OAuth client ID for a web application.
+5. Add your app origin to Authorized JavaScript origins, for example `https://ralph-vx.github.io`.
+6. Put the client ID in `data/google-config.js`:
+
+```js
+TrickalBoard.GOOGLE_CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com";
+```
+
+The client ID is public by design. Use only the `drive.appdata` scope so the app cannot access the user's normal Drive files. If no client ID is configured, the app keeps working with local storage and manual JSON import/export.
+
+Google OAuth requires the page origin to match the authorized JavaScript origins on the OAuth client. For local Drive sync testing, serve the app over `http://localhost` instead of opening `index.html` as a `file://` URL.
 
 ## Adding New Characters
 

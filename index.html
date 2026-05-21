@@ -21,11 +21,21 @@
           <option value="zh-Hant">繁體中文</option>
         </select>
       </label>
-      <button id="exportState" type="button" data-i18n="action.export">Export JSON</button>
-      <label class="file-button">
-        <span data-i18n="action.import">Import JSON</span>
-        <input id="importState" type="file" accept="application/json,.json">
-      </label>
+      <div id="dataMenu" class="data-menu">
+        <button id="dataMenuButton" class="data-menu-button" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="action.dataMenu">Data</button>
+        <div id="dataMenuPanel" class="data-menu-panel" role="menu" hidden>
+          <button id="exportState" class="menu-item" type="button" role="menuitem" data-i18n="action.export">Export JSON</button>
+          <label id="importStateLabel" class="file-button menu-item" role="menuitem" tabindex="0">
+            <span data-i18n="action.import">Import JSON</span>
+            <input id="importState" type="file" accept="application/json,.json">
+          </label>
+          <div class="menu-separator" role="separator"></div>
+          <button id="connectDrive" class="menu-item" type="button" role="menuitem" data-i18n="action.driveConnect">Connect Google Drive</button>
+          <button id="saveDrive" class="menu-item" type="button" role="menuitem" data-i18n="action.driveSave">Save to Drive</button>
+          <button id="loadDrive" class="menu-item" type="button" role="menuitem" data-i18n="action.driveLoad">Load from Drive</button>
+          <span id="driveStatus" class="drive-status" role="status" aria-live="polite"></span>
+        </div>
+      </div>
       <button id="resetState" type="button" class="danger" data-i18n="action.reset">Reset</button>
     </div>
   </header>
@@ -215,6 +225,8 @@
   <script src="./data/i18n.js"></script>
   <script src="./data/board-data.js"></script>
   <script src="./data/characters.js"></script>
+  <script src="./data/google-config.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="./app.js"></script>
 </body>
 </html>

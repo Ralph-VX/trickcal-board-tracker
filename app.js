@@ -2,10 +2,17 @@
   "use strict";
 
   const STORAGE_KEY = "trickal-board-tracker:v1";
+  const STATE_UPDATED_STORAGE_KEY = "trickal-board-tracker:updated-at";
   const LANGUAGE_STORAGE_KEY = "trickal-board-tracker:language";
+  const DRIVE_SYNC_STORAGE_KEY = "trickal-board-tracker:google-drive-sync-enabled";
   const STORAGE_VERSION = 2;
   const DEFAULT_LANGUAGE = "ja";
   const SUPPORTED_LANGUAGES = ["ja", "en", "zh-Hant"];
+  const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+  const DRIVE_FILE_NAME = "trickcal-board-tracker-state.json";
+  const DRIVE_PAYLOAD_VERSION = 1;
+  const DRIVE_SYNC_DEBOUNCE_MS = 2000;
+  const DRIVE_AUTH_TIMEOUT_MS = 60000;
 
   const DATA = window.TrickalBoard || {};
   const {
@@ -16,7 +23,8 @@
     CRAYON_LABEL,
     CELL_LABELS,
     TYPES,
-    CHARACTERS
+    CHARACTERS,
+    GOOGLE_CLIENT_ID
   } = DATA;
 
   validateData();
@@ -86,8 +94,16 @@
     upgradeFilter: document.getElementById("upgradeFilter"),
     statsCellFilter: document.getElementById("statsCellFilter"),
     statsOwnedFilter: document.getElementById("statsOwnedFilter"),
+    dataMenu: document.getElementById("dataMenu"),
+    dataMenuButton: document.getElementById("dataMenuButton"),
+    dataMenuPanel: document.getElementById("dataMenuPanel"),
     exportState: document.getElementById("exportState"),
+    importStateLabel: document.getElementById("importStateLabel"),
     importState: document.getElementById("importState"),
+    connectDrive: document.getElementById("connectDrive"),
+    saveDrive: document.getElementById("saveDrive"),
+    loadDrive: document.getElementById("loadDrive"),
+    driveStatus: document.getElementById("driveStatus"),
     resetState: document.getElementById("resetState"),
     languageSelect: document.getElementById("languageSelect"),
     markVisibleOwned: document.getElementById("markVisibleOwned"),
@@ -95,10 +111,17 @@
   };
 
   let state = loadState();
+  let localUpdatedAt = loadStateUpdatedAt(state);
   let visibleCharacters = [];
   let activeStatsBoard = "all";
   let currentLanguage = loadLanguage();
   let trackerSort = { column: "name", direction: "asc" };
+  let googleAccessToken = "";
+  let googleTokenExpiresAt = 0;
+  let googleTokenClient = null;
+  let driveFileId = "";
+  let driveSyncTimer = 0;
+  let driveBusy = false;
 
   function loadLanguage() {
     const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -106,7 +129,7 @@
   }
 
   function t(key, replacements = {}) {
-    const value = I18N[currentLanguage][key] || I18N[DEFAULT_LANGUAGE][key] || key;
+    const value = I18N[currentLanguage][key] || I18N.en[key] || I18N[DEFAULT_LANGUAGE][key] || key;
     return value.replace(/\{(\w+)\}/g, (match, name) => {
       return Object.prototype.hasOwnProperty.call(replacements, name) ? replacements[name] : match;
     });
@@ -193,6 +216,7 @@
     }
     elements.languageSelect.value = currentLanguage;
     updateSortHeaders();
+    updateDriveControls();
   }
 
   function defaultCharacterState() {
@@ -213,6 +237,17 @@
     return state.characters[id];
   }
 
+  function hasTrackedProgress(input) {
+    if (!input || !input.characters || typeof input.characters !== "object") return false;
+    return Object.values(input.characters).some((characterState) => {
+      if (!characterState || typeof characterState !== "object") return false;
+      return Boolean(characterState.owned) || BOARDS.some((board) => {
+        return Array.isArray(characterState.upgraded && characterState.upgraded[board])
+          && characterState.upgraded[board].length > 0;
+      });
+    });
+  }
+
   function loadState() {
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -222,8 +257,35 @@
     }
   }
 
-  function saveState() {
+  function loadStateUpdatedAt(loadedState) {
+    const saved = localStorage.getItem(STATE_UPDATED_STORAGE_KEY);
+    if (isValidTimestamp(saved)) return saved;
+
+    const fallback = hasTrackedProgress(loadedState) ? new Date().toISOString() : "";
+    if (fallback) {
+      localStorage.setItem(STATE_UPDATED_STORAGE_KEY, fallback);
+    }
+    return fallback;
+  }
+
+  function isValidTimestamp(value) {
+    return typeof value === "string" && value.length > 0 && !Number.isNaN(Date.parse(value));
+  }
+
+  function writeLocalState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (localUpdatedAt) {
+      localStorage.setItem(STATE_UPDATED_STORAGE_KEY, localUpdatedAt);
+    }
+  }
+
+  function saveState(options = {}) {
+    const { queueDrive = true } = options;
+    localUpdatedAt = new Date().toISOString();
+    writeLocalState();
+    if (queueDrive) {
+      queueDriveSave();
+    }
   }
 
   function sanitizeState(input) {
@@ -294,6 +356,380 @@
           }
         }
       }
+    }
+  }
+
+  function googleClientId() {
+    return typeof GOOGLE_CLIENT_ID === "string" ? GOOGLE_CLIENT_ID.trim() : "";
+  }
+
+  function isDriveConfigured() {
+    const clientId = googleClientId();
+    return clientId.length > 0 && !clientId.includes("YOUR_GOOGLE_CLIENT_ID");
+  }
+
+  function isDriveSyncEnabled() {
+    return localStorage.getItem(DRIVE_SYNC_STORAGE_KEY) === "true";
+  }
+
+  function setDriveSyncEnabled(enabled) {
+    localStorage.setItem(DRIVE_SYNC_STORAGE_KEY, enabled ? "true" : "false");
+  }
+
+  function setDriveStatus(key, replacements = {}) {
+    if (!elements.driveStatus) return;
+    elements.driveStatus.textContent = t(key, replacements);
+  }
+
+  function updateDriveControls() {
+    if (!elements.connectDrive) return;
+
+    const configured = isDriveConfigured();
+    elements.connectDrive.disabled = !configured || driveBusy;
+    elements.saveDrive.disabled = !configured || driveBusy;
+    elements.loadDrive.disabled = !configured || driveBusy;
+    elements.connectDrive.textContent = t(isDriveSyncEnabled() ? "action.driveReconnect" : "action.driveConnect");
+
+    if (!configured) {
+      setDriveStatus("drive.status.notConfigured");
+    } else if (!elements.driveStatus.textContent) {
+      setDriveStatus(isDriveSyncEnabled() ? "drive.status.reconnect" : "drive.status.ready");
+    }
+  }
+
+  function setDataMenuOpen(open) {
+    if (!elements.dataMenuPanel || !elements.dataMenuButton) return;
+    elements.dataMenuPanel.hidden = !open;
+    elements.dataMenuButton.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function isDataMenuOpen() {
+    return elements.dataMenuPanel && !elements.dataMenuPanel.hidden;
+  }
+
+  function closeDataMenu() {
+    setDataMenuOpen(false);
+  }
+
+  function toggleDataMenu() {
+    setDataMenuOpen(!isDataMenuOpen());
+  }
+
+  function closeDataMenuAfterAction() {
+    window.setTimeout(closeDataMenu, 0);
+  }
+
+  function driveTimestampValue(value) {
+    return isValidTimestamp(value) ? Date.parse(value) : 0;
+  }
+
+  function drivePayload() {
+    return {
+      app: "trickcal-board-tracker",
+      version: DRIVE_PAYLOAD_VERSION,
+      updatedAt: localUpdatedAt || new Date().toISOString(),
+      state: sanitizeState(state)
+    };
+  }
+
+  function validateDrivePayload(input) {
+    if (input && input.state) {
+      validateImportedState(input.state);
+      return {
+        state: sanitizeState(input.state),
+        updatedAt: isValidTimestamp(input.updatedAt) ? input.updatedAt : ""
+      };
+    }
+
+    validateImportedState(input);
+    return {
+      state: sanitizeState(input),
+      updatedAt: ""
+    };
+  }
+
+  function waitForGoogleIdentity() {
+    if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve, reject) => {
+      const startedAt = Date.now();
+      const timer = window.setInterval(() => {
+        if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+          window.clearInterval(timer);
+          resolve();
+        } else if (Date.now() - startedAt > 10000) {
+          window.clearInterval(timer);
+          reject(new Error(t("error.driveLibraryUnavailable")));
+        }
+      }, 100);
+    });
+  }
+
+  function hasValidDriveToken() {
+    return googleAccessToken && Date.now() < googleTokenExpiresAt - 60000;
+  }
+
+  async function requestDriveToken() {
+    if (!isDriveConfigured()) {
+      throw new Error(t("error.driveNotConfigured"));
+    }
+    if (hasValidDriveToken()) {
+      return googleAccessToken;
+    }
+
+    await waitForGoogleIdentity();
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (callback) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        callback();
+      };
+      const timeout = window.setTimeout(() => {
+        finish(() => reject(new Error(t("error.driveAuthCancelled"))));
+      }, DRIVE_AUTH_TIMEOUT_MS);
+
+      googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: googleClientId(),
+        scope: DRIVE_SCOPE,
+        callback: (response) => {
+          finish(() => {
+            if (response.error) {
+              reject(new Error(response.error_description || response.error));
+              return;
+            }
+            googleAccessToken = response.access_token;
+            googleTokenExpiresAt = Date.now() + Number(response.expires_in || 3600) * 1000;
+            resolve(googleAccessToken);
+          });
+        },
+        error_callback: () => {
+          finish(() => reject(new Error(t("error.driveAuthCancelled"))));
+        }
+      });
+
+      googleTokenClient.requestAccessToken({ prompt: googleAccessToken ? "" : "consent" });
+    });
+  }
+
+  async function driveRequest(url, options = {}) {
+    const token = await requestDriveToken();
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (response.status === 401) {
+      googleAccessToken = "";
+      googleTokenExpiresAt = 0;
+    }
+
+    if (!response.ok) {
+      let message = response.statusText;
+      try {
+        const details = await response.json();
+        message = details.error && details.error.message ? details.error.message : message;
+      } catch (error) {
+        // Keep the HTTP status text when Drive does not return JSON.
+      }
+      throw new Error(message || `HTTP ${response.status}`);
+    }
+
+    if (response.status === 204) return null;
+    return response;
+  }
+
+  async function findDriveFile() {
+    if (driveFileId) return driveFileId;
+
+    const query = encodeURIComponent(`name = '${DRIVE_FILE_NAME}' and trashed = false`);
+    const fields = encodeURIComponent("files(id,name,modifiedTime)");
+    const response = await driveRequest(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&fields=${fields}`
+    );
+    const result = await response.json();
+    driveFileId = result.files && result.files.length ? result.files[0].id : "";
+    return driveFileId;
+  }
+
+  async function loadDrivePayload() {
+    const fileId = await findDriveFile();
+    if (!fileId) return null;
+
+    const response = await driveRequest(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+    return validateDrivePayload(await response.json());
+  }
+
+  async function createDriveFile() {
+    const boundary = "trickcal-board-tracker-boundary";
+    const metadata = {
+      name: DRIVE_FILE_NAME,
+      parents: ["appDataFolder"],
+      mimeType: "application/json"
+    };
+    const body = [
+      `--${boundary}`,
+      "Content-Type: application/json; charset=UTF-8",
+      "",
+      JSON.stringify(metadata),
+      `--${boundary}`,
+      "Content-Type: application/json; charset=UTF-8",
+      "",
+      JSON.stringify(drivePayload(), null, 2),
+      `--${boundary}--`
+    ].join("\r\n");
+
+    const response = await driveRequest(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": `multipart/related; boundary=${boundary}`
+        },
+        body
+      }
+    );
+    const result = await response.json();
+    driveFileId = result.id;
+  }
+
+  async function uploadDriveState() {
+    if (!localUpdatedAt) {
+      localUpdatedAt = new Date().toISOString();
+      writeLocalState();
+    }
+
+    const fileId = await findDriveFile();
+    if (!fileId) {
+      await createDriveFile();
+      return;
+    }
+
+    await driveRequest(
+      `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8"
+        },
+        body: JSON.stringify(drivePayload(), null, 2)
+      }
+    );
+  }
+
+  function queueDriveSave() {
+    if (!isDriveSyncEnabled() || !hasValidDriveToken()) {
+      if (isDriveSyncEnabled() && isDriveConfigured()) {
+        setDriveStatus("drive.status.reconnect");
+      }
+      return;
+    }
+
+    window.clearTimeout(driveSyncTimer);
+    driveSyncTimer = window.setTimeout(() => {
+      saveDriveNow({ silent: true });
+    }, DRIVE_SYNC_DEBOUNCE_MS);
+  }
+
+  async function saveDriveNow(options = {}) {
+    const { silent = false } = options;
+    if (driveBusy) return;
+
+    driveBusy = true;
+    updateDriveControls();
+    if (!silent) setDriveStatus("drive.status.saving");
+
+    try {
+      await requestDriveToken();
+      setDriveSyncEnabled(true);
+      await uploadDriveState();
+      setDriveStatus("drive.status.saved", { time: formatSyncTime(new Date()) });
+    } catch (error) {
+      setDriveStatus("drive.status.error", { message: error.message });
+    } finally {
+      driveBusy = false;
+      updateDriveControls();
+    }
+  }
+
+  async function loadDriveNow() {
+    if (driveBusy) return;
+
+    driveBusy = true;
+    updateDriveControls();
+    setDriveStatus("drive.status.loading");
+
+    try {
+      await requestDriveToken();
+      setDriveSyncEnabled(true);
+      const remote = await loadDrivePayload();
+      if (!remote) {
+        setDriveStatus("drive.status.noFile");
+        return;
+      }
+      state = remote.state;
+      localUpdatedAt = remote.updatedAt || new Date().toISOString();
+      writeLocalState();
+      render();
+      setDriveStatus("drive.status.loaded", { time: formatSyncTime(new Date()) });
+    } catch (error) {
+      setDriveStatus("drive.status.error", { message: error.message });
+    } finally {
+      driveBusy = false;
+      updateDriveControls();
+    }
+  }
+
+  async function connectDrive() {
+    if (driveBusy) return;
+
+    driveBusy = true;
+    updateDriveControls();
+    setDriveStatus("drive.status.connecting");
+
+    try {
+      await requestDriveToken();
+      setDriveSyncEnabled(true);
+      const remote = await loadDrivePayload();
+      if (!remote) {
+        await uploadDriveState();
+        setDriveStatus("drive.status.saved", { time: formatSyncTime(new Date()) });
+        return;
+      }
+
+      if (driveTimestampValue(remote.updatedAt) > driveTimestampValue(localUpdatedAt)) {
+        state = remote.state;
+        localUpdatedAt = remote.updatedAt;
+        writeLocalState();
+        render();
+        setDriveStatus("drive.status.loaded", { time: formatSyncTime(new Date()) });
+      } else {
+        await uploadDriveState();
+        setDriveStatus("drive.status.saved", { time: formatSyncTime(new Date()) });
+      }
+    } catch (error) {
+      setDriveStatus("drive.status.error", { message: error.message });
+    } finally {
+      driveBusy = false;
+      updateDriveControls();
+    }
+  }
+
+  function formatSyncTime(date) {
+    return date.toLocaleTimeString(currentLanguage, { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function initializeDriveSync() {
+    updateDriveControls();
+    if (isDriveConfigured() && isDriveSyncEnabled()) {
+      setDriveStatus("drive.status.reconnect");
     }
   }
 
@@ -669,6 +1105,11 @@
     }
   }
 
+  async function exportStateFromMenu() {
+    await exportState();
+    closeDataMenuAfterAction();
+  }
+
   function importState(file) {
     if (!file) return;
     const reader = new FileReader();
@@ -686,6 +1127,11 @@
       }
     });
     reader.readAsText(file);
+  }
+
+  function importStateFromMenu(file) {
+    importState(file);
+    closeDataMenuAfterAction();
   }
 
   function resetState() {
@@ -729,17 +1175,74 @@
       button.addEventListener("click", () => setSort(header.dataset.sortColumn));
     }
 
-    elements.exportState.addEventListener("click", exportState);
-    elements.importState.addEventListener("change", () => importState(elements.importState.files[0]));
+    elements.dataMenuButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (isDataMenuOpen() && elements.dataMenu.matches(":hover")) return;
+      toggleDataMenu();
+    });
+    elements.dataMenuButton.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setDataMenuOpen(true);
+        const firstItem = elements.dataMenuPanel.querySelector(".menu-item:not(:disabled)");
+        if (firstItem) firstItem.focus();
+      }
+    });
+    elements.dataMenu.addEventListener("mouseenter", () => setDataMenuOpen(true));
+    elements.dataMenu.addEventListener("mouseleave", () => {
+      if (!elements.dataMenu.contains(document.activeElement)) {
+        closeDataMenu();
+      }
+    });
+    elements.dataMenu.addEventListener("focusout", () => {
+      window.setTimeout(() => {
+        if (!elements.dataMenu.contains(document.activeElement)) {
+          closeDataMenu();
+        }
+      }, 0);
+    });
+    document.addEventListener("click", (event) => {
+      if (!elements.dataMenu.contains(event.target)) {
+        closeDataMenu();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeDataMenu();
+        elements.dataMenuButton.focus();
+      }
+    });
+
+    elements.exportState.addEventListener("click", exportStateFromMenu);
+    elements.importStateLabel.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        elements.importState.click();
+      }
+    });
+    elements.importState.addEventListener("change", () => importStateFromMenu(elements.importState.files[0]));
+    elements.connectDrive.addEventListener("click", () => {
+      connectDrive();
+      closeDataMenuAfterAction();
+    });
+    elements.saveDrive.addEventListener("click", () => {
+      saveDriveNow();
+      closeDataMenuAfterAction();
+    });
+    elements.loadDrive.addEventListener("click", () => {
+      loadDriveNow();
+      closeDataMenuAfterAction();
+    });
     elements.resetState.addEventListener("click", resetState);
     elements.languageSelect.addEventListener("change", () => setLanguage(elements.languageSelect.value));
     elements.markVisibleOwned.addEventListener("click", () => applyVisibleOwnership(true));
     elements.markVisibleUnowned.addEventListener("click", () => applyVisibleOwnership(false));
   }
 
-  saveState();
+  writeLocalState();
   applyStaticTranslations();
   populateFilters();
   bindEvents();
+  initializeDriveSync();
   render();
 })();
