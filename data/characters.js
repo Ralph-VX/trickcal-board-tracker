@@ -683,6 +683,16 @@
       "en": "Kyarot",
       "zh-Hant": "卡洛特"
     }
+  },
+  {
+    "id": "ner",
+    "name": "ネル",
+    "race": "妖精",
+    "type": 1,
+    "names": {
+      "en": "Ner",
+      "zh-Hant": "寧琉"
+    }
   }
 ];
 })(window);
