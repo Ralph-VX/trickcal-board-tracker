@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy - Trickcal Board Tracker</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Privacy Policy</h1>
+      <p>Trickcal Board Tracker</p>
+    </div>
+    <div class="header-actions">
+      <a class="button-link" href="./index.html">Back to app</a>
+    </div>
+  </header>
+
+  <main class="policy-page">
+    <article class="policy-panel">
+      <p class="policy-updated">Last updated: May 22, 2026</p>
+
+      <section>
+        <h2>Overview</h2>
+        <p>
+          Trickcal Board Tracker is a client-only web app for tracking character ownership and board upgrade progress.
+          The app does not have its own backend server, account system, analytics service, or advertising system.
+        </p>
+      </section>
+
+      <section>
+        <h2>Data Stored in Your Browser</h2>
+        <p>The app stores the following data in your browser's local storage:</p>
+        <ul>
+          <li>Your tracker state, including owned characters and board upgrade selections.</li>
+          <li>Your selected language.</li>
+          <li>Whether Google Drive sync was enabled.</li>
+          <li>A local updated timestamp used to compare local data with Google Drive data.</li>
+        </ul>
+        <p>
+          This local data stays in your browser unless you export it, clear it, or choose to sync it with Google Drive.
+        </p>
+      </section>
+
+      <section>
+        <h2>Optional Google Drive Sync</h2>
+        <p>
+          Google Drive sync is optional. If you choose to connect Google Drive, the app requests access only to this
+          Google Drive API scope:
+        </p>
+        <pre><code>https://www.googleapis.com/auth/drive.appdata</code></pre>
+        <p>
+          This scope lets the app create, read, and update its own hidden app data file in your Google Drive
+          <code>appDataFolder</code>. The app stores one JSON file containing your tracker state and sync timestamp.
+        </p>
+        <p>
+          The app cannot access, list, edit, or delete your normal Google Drive files.
+        </p>
+      </section>
+
+      <section>
+        <h2>Data Sharing</h2>
+        <p>
+          The maintainer does not receive your tracker data. The app does not sell, share, transfer, or use your data
+          for advertising. If you use Google Drive sync, your tracker data is sent directly between your browser and
+          Google's Drive API for storage in your own Google account.
+        </p>
+      </section>
+
+      <section>
+        <h2>Deleting Your Data</h2>
+        <p>You can delete or revoke access to your data in these ways:</p>
+        <ul>
+          <li>Use the app's Reset button to clear tracker progress in the current browser.</li>
+          <li>Clear this site's browser storage from your browser settings.</li>
+          <li>Revoke the app's Google access from your Google Account permissions page.</li>
+          <li>Remove the app's stored data from Google Drive app management, where available.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Contact</h2>
+        <p>
+          For questions or issues, use the project repository:
+          <a href="https://github.com/ralph-vx/trickcal-board-tracker">https://github.com/ralph-vx/trickcal-board-tracker</a>
+        </p>
+      </section>
+    </article>
+  </main>
+
+  <footer class="app-footer">
+    <a href="./index.html">Back to app</a>
+  </footer>
+</body>
+</html>

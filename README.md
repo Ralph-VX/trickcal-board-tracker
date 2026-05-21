@@ -49,6 +49,10 @@ The client ID is public by design. Use only the `drive.appdata` scope so the app
 
 Google OAuth requires the page origin to match the authorized JavaScript origins on the OAuth client. For local Drive sync testing, serve the app over `http://localhost` instead of opening `index.html` as a `file://` URL.
 
+For the Google OAuth app configuration, use this privacy policy URL for the public GitHub Pages deployment:
+
+**https://ralph-vx.github.io/trickcal-board-tracker/privacy.html**
+
 ## Adding New Characters
 
 Character data lives in:
@@ -90,4 +94,6 @@ This app is client-only. No account or server is required, and tracker progress 
 
 AI運用の練習もかねているため、このセクションを除いてすべてAI製です。
 ご自由にご利用ください。
+Google CloudのClient IDこのリポジトリからのアクセスのみ許可しているため、
+別でホスティングする場合はご用意ください。
 キャラ追加は遊んでいる間は適時追加していきます。
