@@ -693,6 +693,16 @@
       "en": "Ner",
       "zh-Hant": "寧琉"
     }
+  },
+  {
+    "id": "risty",
+    "name": "リスティ",
+    "race": "エルフ",
+    "type": 1,
+    "names": {
+      "en": "Risty",
+      "zh-Hant": "莉絲蒂"
+    }
   }
 ];
 })(window);
