@@ -703,6 +703,16 @@
       "en": "Risty",
       "zh-Hant": "莉絲蒂"
     }
+  },
+  {
+    "id": "renewa",
+    "name": "リニュア",
+    "race": "エルフ",
+    "type": 1,
+    "names": {
+      "en": "Renewa",
+      "zh-Hant": "雷內瓦"
+    }
   }
 ];
 })(window);
