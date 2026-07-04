@@ -713,6 +713,16 @@
       "en": "Renewa",
       "zh-Hant": "雷內瓦"
     }
+  },
+  {
+    "id": "barong",
+    "name": "バロン",
+    "race": "幽霊",
+    "type": 3,
+    "names": {
+      "en": "Barong",
+      "zh-Hant": "芭瓏"
+    }
   }
 ];
 })(window);
