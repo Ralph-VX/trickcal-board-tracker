@@ -723,6 +723,26 @@
       "en": "Barong",
       "zh-Hant": "芭瓏"
     }
+  },
+  {
+    "id": "tig",
+    "name": "ティグ",
+    "race": "獣人",
+    "type": 3,
+    "names": {
+      "en": "Tig",
+      "zh-Hant": "提格"
+    }
+  },
+  {
+    "id": "daya",
+    "name": "ダーヤ",
+    "race": "竜族",
+    "type": 2,
+    "names": {
+      "en": "Daya",
+      "zh-Hant": "達雅"
+    }
   }
 ];
 })(window);
