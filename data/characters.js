@@ -747,8 +747,8 @@
   {
     "id": "rollett",
     "name": "ロレット",
-    "race": "竜族",
-    "type": 2,
+    "race": "魔女",
+    "type": 3,
     "names": {
       "en": "Rollett",
       "zh-Hant": "羅蕾特"
