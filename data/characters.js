@@ -743,6 +743,16 @@
       "en": "Daya",
       "zh-Hant": "達雅"
     }
-  }
+  },
+  {
+    "id": "rollett",
+    "name": "ロレット",
+    "race": "竜族",
+    "type": 2,
+    "names": {
+      "en": "Rollett",
+      "zh-Hant": "羅蕾特"
+    }
+  },
 ];
 })(window);
