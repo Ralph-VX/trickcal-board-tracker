@@ -754,5 +754,15 @@
       "zh-Hant": "羅蕾特"
     }
   },
+  {
+    "id": "pira",
+    "name": "ピラ",
+    "race": "竜族",
+    "type": 5,
+    "names": {
+      "en": "Pira",
+      "zh-Hant": "琵拉"
+    }
+  },
 ];
 })(window);
