@@ -764,5 +764,25 @@
       "zh-Hant": "琵拉"
     }
   },
+  {
+    "id": "barie",
+    "name": "バリエ",
+    "race": "魔女",
+    "type": 4,
+    "names": {
+      "en": "Barie",
+      "zh-Hant": "芭莉耶"
+    }
+  },
+  {
+    "id": "sherum",
+    "name": "シェルム",
+    "race": "魔女",
+    "type": 5,
+    "names": {
+      "en": "Sherum",
+      "zh-Hant": "雪蘭"
+    }
+  },
 ];
 })(window);
