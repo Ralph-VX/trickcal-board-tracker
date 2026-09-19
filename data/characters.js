@@ -778,7 +778,7 @@
     "id": "sherum",
     "name": "シェルム",
     "race": "魔女",
-    "type": 5,
+    "type": 3,
     "names": {
       "en": "Sherum",
       "zh-Hant": "雪蘭"
